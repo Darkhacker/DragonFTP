@@ -36,6 +36,8 @@
 #include "font.h"
 #include "common.h"
 
+// mumilover stuff
+#define DEBUGARRAYMAXLINES 16
 
 #define FTPPORT 21 
 #define BUFFER_SIZE 32768 
@@ -45,7 +47,7 @@ int DISABLE_PASS = 0; // 0 off 1 on
  PadData paddata;
  int ci;
 
-int debug_app = 1; // turn to 1 if your debugging app       
+int debug_app = 0; // turn to 1 if your debugging app       
 
 int app_state = 1;
 int currentBuffer = 0;
@@ -57,6 +59,7 @@ int option_right = 1;
 int btnPressed;
 int exitapp = 0;
 int state_holder = 1;
+int current_background = 0; // change to 1 for default black for now
 
 int dev_dragon = 0;
 Lv2FsStat deEntry;
@@ -79,6 +82,10 @@ char fps_char[100] = "";
 char userpass[32];
 char status[128];
 char version[32];
+
+// mumilover stuff
+int debugCount = 0; // use it to know how many of the 15 slots are taken.. like an array level pointer#
+char *debugArray[DEBUGARRAYMAXLINES]; //there is room for 16 lines af debug info, each around 60 characters long
 
 u32 font_offset,sprite_offset,background_offset,bsprite_offset;
 PngDatas font_image,sprite_image,background_image,bsprite_image;
@@ -958,11 +965,21 @@ sys_ppu_thread_exit(0);
 }
 
 void screenSaverOPEN() {
-        if(screensaver) {
-        if(sec > keep_value) {
-        deadrsx_offset(background_offset, -51, -69, 950, 650);
-        }
-        }
+      if(screensaver) {
+       if(sec > keep_value) {
+         switch(current_background) {
+         case 0:
+         deadrsx_offset(background_offset, -51, -69, 950, 650);
+         break;
+         case 1:
+        deadrsx_sprite(bsprite_offset, -51, -69, 950, 650, 200, 100, 2, 0, 3, 1);
+        deadrsx_sprite(bsprite_offset, -51, -69, 950, 650, 200, 100, 2, 0, 3, 1);
+        deadrsx_sprite(bsprite_offset, -51, -69, 950, 650, 200, 100, 2, 0, 3, 1);
+        deadrsx_sprite(bsprite_offset, -51, -69, 950, 650, 200, 100, 2, 0, 3, 1);
+         break;
+         }
+       }
+      }
 }
 
 void drawFrame(int buffer, long frame) {
@@ -1080,7 +1097,7 @@ void drawFrame(int buffer, long frame) {
         drawText(font_offset, 30, "On", 460, 125);
         drawText(font_offset, 30, "Off", 660, 125);
 
-        drawText(font_offset, 25, "Screen Saver :", 100, 175);
+        drawText(font_offset, 25, "ScreenSaver :", 100, 175);
         deadrsx_sprite(sprite_offset, 400, 168, 40, 40, 200, 200, 1, 0, 2, 2); // on box
         deadrsx_sprite(sprite_offset, 600, 168, 40, 40, 200, 200, 1, 0, 2, 2); // off box
 
@@ -1105,7 +1122,24 @@ void drawFrame(int buffer, long frame) {
         drawText(font_offset, 30, "Mount", 460, 225);
         drawText(font_offset, 30, "Unmount", 660, 225);
 
-        drawText(font_offset, 25, "Return to Menu", 100, 275);
+        drawText(font_offset, 25, "ScreenSaver Background :", 100, 275);
+        deadrsx_sprite(sprite_offset, 400, 268, 40, 40, 200, 200, 1, 0, 2, 2); // on box
+        deadrsx_sprite(sprite_offset, 600, 268, 40, 40, 200, 200, 1, 0, 2, 2); // off box
+
+        if(current_background == 1) {
+        deadrsx_sprite(bsprite_offset, 405, 273, 30, 30, 200, 100, 2, 0, 3, 1); // selected on  box
+        }else{
+        deadrsx_sprite(bsprite_offset, 605, 273, 30, 30, 200, 100, 2, 0, 3, 1); // selected off box
+        }
+        drawText(font_offset, 30, "Black", 460, 275);
+        drawText(font_offset, 30, "Dragon", 660, 275);
+
+        drawText(font_offset, 25, "ScreenSaver Timer :", 100, 325);
+        char timerholdok[100];
+        sprintf(timerholdok, "%i Minutes", minbackground);
+        drawText(font_offset, 30, timerholdok, 390,325);          
+
+        drawText(font_offset, 25, "Return to Menu", 100, 375);
 
         switch(option_down) {
         case 1:
@@ -1119,6 +1153,12 @@ void drawFrame(int buffer, long frame) {
         break;
         case 4:
         deadrsx_sprite(bsprite_offset, 50, 263, 50, 50, 200, 100, 0, 0, 2, 1);
+        break;
+        case 5:
+        deadrsx_sprite(bsprite_offset, 50, 313, 50, 50, 200, 100, 0, 0, 2, 1);
+        break;
+        case 6:
+        deadrsx_sprite(bsprite_offset, 50, 363, 50, 50, 200, 100, 0, 0, 2, 1);
         break;
         }
 
@@ -1136,7 +1176,18 @@ void drawFrame(int buffer, long frame) {
         drawText(font_offset, 15, fps_char, 0, 0);
         drawText(font_offset, 38, "DragonFTP Debug Information", 45, 50);
 
-        // devs use for printing debug information
+		if(debugCount > 0)
+                {
+                    int lineStartPosY = 100; //must be corrected if you add more permanent lines
+                    for(int i = 0; (i < debugCount) && (i < DEBUGARRAYMAXLINES); i++)
+                    {
+                        if(debugArray[i] != NULL)
+                        {
+                            drawText(font_offset, 24, debugArray[i], 45, lineStartPosY);
+                            lineStartPosY = lineStartPosY + 25;
+                        }
+                    }
+                }
 
         }
         break;
@@ -1157,11 +1208,8 @@ void unmount_dragon(){
 Lv2Syscall1(838, (u64)"/dev_dragon");
 }
 
-void appCleanup(){
-	sysUnregisterCallback(EVENT_SLOT0);
-}
 void appExit() {
-  appCleanup();
+  sysUnregisterCallback(EVENT_SLOT0);
   netDeinitialize();
   exit(0);
 }
@@ -1308,7 +1356,7 @@ void ps_controller() {
                                 btnPressed = 1;
                                 switch(option_down) { 
       
-                                case 4:
+                                case 6:
                                 sleep(1);
                                 app_state = 1;
                                 break;   
@@ -1331,7 +1379,7 @@ void ps_controller() {
                                 update_movement();
                                 if(btnPressed == 0){
                                 btnPressed = 1;
-                                if(option_down < 4) {
+                                if(option_down < 6) {
                                 option_down += 1;
                                 }
 
@@ -1351,6 +1399,19 @@ void ps_controller() {
                                 case 3:
                                 unmount_dragon();
                                 break;
+                                
+                                case 4:
+                                current_background = 0;
+                                break;
+ 
+                                case 5:
+                                if(btnPressed == 0) {
+                                btnPressed = 1;
+                                if(minbackground < 120) { // timer could be set to 2 hour that good 
+                                minbackground += 1;
+                                }
+                                }
+                                break;
                                 }
 
                                 }else if(paddata.BTN_LEFT){
@@ -1367,6 +1428,20 @@ void ps_controller() {
                                 case 3:
                                 mount_dragon();
                                 break;
+ 
+                                case 4:
+                                current_background = 1;
+                                break;
+
+                                case 5:
+                                if(btnPressed == 0) {
+                                btnPressed = 1;
+                                if(minbackground > 1) {
+                                minbackground -= 1;
+                                }
+                                }
+                                break;
+
                                 }
 
                                 }else{
@@ -1399,7 +1474,7 @@ s32 main(s32 argc, const char* argv[])
         sprintf(version, "Version %s", VERSION);
         strcpy(userpass, D_PASS);
 
-	atexit(appCleanup);
+
 	deadrsx_init();
 	ioPadInit(7);
 	sysRegisterCallback(EVENT_SLOT0, eventHandle, NULL);
